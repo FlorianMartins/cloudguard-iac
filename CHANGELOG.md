@@ -7,6 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- CI: pinned every GitHub Action to its current major version (`checkout@v7`,
+  `setup-python@v7`, `upload-artifact@v7`, `codeql-action@v4`) — the previous ones still
+  target the deprecated Node 20 runtime.
+
 ### Fixed
 
 - CI: the `ci` gate job used a double-quoted string inside a `${{ }}` expression, which
