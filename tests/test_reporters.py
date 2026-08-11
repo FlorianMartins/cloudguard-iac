@@ -220,6 +220,30 @@ class TestSarif:
         assert location["region"]["startLine"] == 12
         assert first["properties"]["security-severity"] == "9.5"
 
+    def test_fingerprints_are_unique_and_line_independent(self):
+        """GitHub tracks an alert by its fingerprint: unique, but stable on a move."""
+        scan = ScanResult(tool_version="1.0.0")
+        scan.extend(
+            [
+                Finding("CG_IAC_011", "t", Severity.CRITICAL, "a.tf", 5, "provider.aws", "key A"),
+                Finding("CG_IAC_011", "t", Severity.CRITICAL, "a.tf", 6, "provider.aws", "key B"),
+            ]
+        )
+        first = json.loads(sarif_reporter.render(scan))["runs"][0]["results"]
+        assert len({r["partialFingerprints"]["cloudguard/v1"] for r in first}) == 2
+
+        moved = ScanResult(tool_version="1.0.0")
+        moved.extend(
+            [
+                Finding("CG_IAC_011", "t", Severity.CRITICAL, "a.tf", 90, "provider.aws", "key A"),
+                Finding("CG_IAC_011", "t", Severity.CRITICAL, "a.tf", 91, "provider.aws", "key B"),
+            ]
+        )
+        second = json.loads(sarif_reporter.render(moved))["runs"][0]["results"]
+        assert [r["partialFingerprints"] for r in first] == [
+            r["partialFingerprints"] for r in second
+        ]
+
     def test_every_registry_rule_can_be_described(self):
         """A rule missing from the registry would break the SARIF upload."""
         scan = ScanResult(tool_version="1.0.0")

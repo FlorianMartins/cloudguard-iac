@@ -7,10 +7,11 @@ line of the pull request diff.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
-from cloudguard.models import ScanResult, Severity
+from cloudguard.models import Finding, ScanResult, Severity
 from cloudguard.rules import RULES
 
 SARIF_VERSION = "2.1.0"
@@ -63,6 +64,19 @@ def _rule_descriptor(rule_id: str) -> dict[str, Any]:
     }
 
 
+def _fingerprint(finding: Finding) -> str:
+    """Stable identity of a finding, used by GitHub to track an alert over time.
+
+    The line number is deliberately excluded: an alert must survive code being
+    moved up or down a file. The message is included because it names the
+    offending attribute, which is what distinguishes two findings of the same
+    rule on the same resource — the two hardcoded keys of a single `provider`
+    block, for instance.
+    """
+    identity = f"{finding.rule_id}:{finding.file}:{finding.resource}:{finding.message}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()[:32]
+
+
 def render(result: ScanResult, *, threshold: Severity | None = None) -> str:  # noqa: ARG001
     """Render a scan result as a SARIF 2.1.0 document."""
     used_rules = sorted({f.rule_id for f in result.findings if f.rule_id in RULES})
@@ -87,9 +101,7 @@ def render(result: ScanResult, *, threshold: Severity | None = None) -> str:  # 
                 "resource": finding.resource,
                 "security-severity": _SECURITY_SCORE[finding.severity],
             },
-            "partialFingerprints": {
-                "cloudguard/v1": f"{finding.rule_id}:{finding.file}:{finding.resource}",
-            },
+            "partialFingerprints": {"cloudguard/v1": _fingerprint(finding)},
         }
         for finding in result.sorted_findings()
     ]

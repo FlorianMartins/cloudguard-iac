@@ -15,6 +15,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- SARIF: the alert fingerprint now includes the finding message, so two findings of the
+  same rule on the same resource — the two hardcoded credentials of one `provider` block —
+  no longer collapse into a single GitHub code-scanning alert. The line number stays out
+  of the fingerprint, so an alert still survives code being moved within a file.
 - CI: the `ci` gate job used a double-quoted string inside a `${{ }}` expression, which
   GitHub rejects — the whole workflow failed to start. `actionlint` now runs in the
   `quality` job, in `make lint` and in the pre-commit hooks, so a workflow syntax error is
