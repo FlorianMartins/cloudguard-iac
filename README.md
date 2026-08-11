@@ -59,7 +59,7 @@ CloudGuard-IaC is the gate for that step. It is:
 | 🚦 **A CI/CD gate** | Exit code `1` as soon as a finding reaches the configured severity, so the pipeline stops before `terraform apply` or `docker push`. |
 | 📚 **A teaching tool** | Every finding explains *why it is dangerous* and *how to fix it*, with a link to the vendor documentation or the CWE. |
 | 📄 **A reporting engine** | Console, Markdown, HTML dashboard, JSON and **SARIF 2.1.0** for native GitHub code scanning alerts. |
-| 🪶 **Dependency-light** | Two runtime dependencies (`typer`, `rich`). No Docker daemon, no Go toolchain, no cloud SDK. Installs in seconds in any runner. |
+| 🪶 **Dependency-light** | Two runtime dependencies — `typer` and `rich` (plus `tomli` on Python 3.10). No Docker daemon, no Go toolchain, no cloud SDK. Installs in seconds in any runner. |
 
 **31 detection rules**, each with a stable identifier, a severity and a documented
 remediation — [see the full catalogue](#security-rules-catalogue).
