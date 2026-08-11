@@ -31,6 +31,11 @@ repos:
         args: [--strict]
         files: ^cloudguard/
 
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.7
+    hooks:
+      - id: actionlint
+
   - repo: local
     hooks:
       # CloudGuard scanning the repository it lives in.

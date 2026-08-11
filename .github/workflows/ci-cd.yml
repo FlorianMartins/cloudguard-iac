@@ -50,6 +50,11 @@ jobs:
       - name: Mypy — static types (strict)
         run: mypy
 
+      - name: Actionlint — the workflows themselves
+        # A syntax error in this file cancels the whole run before any job
+        # starts, so the pipeline cannot be the thing that catches it.
+        run: actionlint
+
   # ---------------------------------------------------------------------------
   # 2. Tests — every supported Python version
   # ---------------------------------------------------------------------------
@@ -292,7 +297,8 @@ jobs:
     steps:
       - name: Fail when any job failed
         run: |
-          results='${{ join(needs.*.result, " ") }}'
+          # GitHub expressions only accept single-quoted string literals.
+          results='${{ join(needs.*.result, ' ') }}'
           echo "job results: $results"
           for result in $results; do
             if [ "$result" != "success" ]; then

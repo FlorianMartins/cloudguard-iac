@@ -7,7 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- CI: the `ci` gate job used a double-quoted string inside a `${{ }}` expression, which
+  GitHub rejects — the whole workflow failed to start. `actionlint` now runs in the
+  `quality` job, in `make lint` and in the pre-commit hooks, so a workflow syntax error is
+  caught locally instead of cancelling the run that was supposed to catch it.
 
 ## [1.0.0] — 2026-08-11
 

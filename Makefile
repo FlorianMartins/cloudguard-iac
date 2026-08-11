@@ -35,9 +35,10 @@ clean: ## Remove build, cache and report artefacts
 # ---------------------------------------------------------------------------
 
 .PHONY: lint
-lint: ## Lint and check formatting
+lint: ## Lint the Python code, the formatting and the GitHub Actions workflows
 	$(BIN)/ruff check .
 	$(BIN)/ruff format --check .
+	$(BIN)/actionlint
 
 .PHONY: format
 format: ## Format the code and fix what can be fixed

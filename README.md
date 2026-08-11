@@ -737,7 +737,7 @@ cloudguard-iac/
 
 ```bash
 make install     # virtualenv + editable install with the dev extras
-make lint        # ruff check + ruff format --check
+make lint        # ruff check + ruff format --check + actionlint
 make typecheck   # mypy --strict
 make test        # pytest with coverage
 make sast        # bandit + pip-audit on our own code
@@ -753,6 +753,8 @@ make check       # everything the CI pipeline checks
 Every gate below runs on every commit and every pull request:
 
 - **`ruff`** — lint (including `flake8-bandit`, `bugbear`, `pydocstyle`) and formatting
+- **`actionlint`** — the GitHub Actions workflows themselves, since a syntax error there
+  cancels the run before any job can catch it
 - **`mypy --strict`** — no untyped definition, no implicit `Any`
 - **`pytest`** — 399 tests, 90% coverage, on Python 3.10 → 3.13
 - **`bandit` + `pip-audit`** — SAST on our own source and on the dependency tree

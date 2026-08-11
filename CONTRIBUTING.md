@@ -24,7 +24,7 @@ pip install pre-commit && pre-commit install
 
 | Gate | Command | Rule |
 |---|---|---|
-| Lint & format | `make lint` | `ruff check` and `ruff format --check`, no exception |
+| Lint & format | `make lint` | `ruff check`, `ruff format --check` and `actionlint`, no exception |
 | Types | `make typecheck` | `mypy --strict`, no `Any` sneaking in |
 | Tests | `make test` | Every new behaviour has a test; coverage must not go down |
 | SAST | `make sast` | `bandit` and `pip-audit` clean |
