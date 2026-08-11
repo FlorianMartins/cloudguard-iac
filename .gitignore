@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.cache/
+
+# Type checking & linting
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# CloudGuard output
+reports/
+cloudguard-report.*
+cloudguard-results.json
+*.sarif
+
+# Terraform (never commit state: it contains secrets in clear text)
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars.local
+override.tf
+override.tf.json
+
+# Secrets — belt and braces
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+!**/testdata/*.key
+
+# Editors & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

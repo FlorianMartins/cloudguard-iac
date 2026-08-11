@@ -1,0 +1,144 @@
+"""Markdown reporter — for pull request comments and CI job summaries."""
+
+from __future__ import annotations
+
+from cloudguard.engine import group_by_file
+from cloudguard.models import SEVERITY_ORDER, ScanResult, Severity
+
+#: Emoji used to make a severity readable at a glance in a PR comment.
+SEVERITY_ICONS: dict[Severity, str] = {
+    Severity.CRITICAL: "🟥",
+    Severity.HIGH: "🟧",
+    Severity.MEDIUM: "🟨",
+    Severity.LOW: "🟦",
+    Severity.INFO: "⬜",
+}
+
+
+def _escape(text: str) -> str:
+    """Escape the characters that would break a Markdown table cell."""
+    return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def render(result: ScanResult, *, threshold: Severity | None = None) -> str:
+    """Render a scan result as a Markdown document."""
+    counts = result.counts()
+    total = len(result.findings)
+    lines: list[str] = []
+
+    lines.append("# 🛡️ CloudGuard-IaC — security report")
+    lines.append("")
+    lines.append(f"- **Target**: `{result.target or '.'}`")
+    lines.append(f"- **Scanned at**: {result.scanned_at}")
+    lines.append(
+        f"- **Files analysed**: {len(result.files_scanned)} "
+        f"— **duration**: {result.duration_seconds:.2f}s "
+        f"— **CloudGuard**: v{result.tool_version}"
+    )
+    if result.suppressed:
+        lines.append(f"- **Suppressed** by inline directives: {result.suppressed}")
+    lines.append("")
+
+    if total == 0:
+        lines.append("## ✅ No security issue detected")
+        lines.append("")
+        lines.append("Every rule passed on the analysed files.")
+        lines.append("")
+        lines.extend(_footer(result))
+        return "\n".join(lines)
+
+    verdict = (
+        "❌ **Pipeline blocked**" if _blocking(result, threshold) else "⚠️ **Advisory findings**"
+    )
+    if threshold is not None:
+        blocking_count = result.count_at_or_above(threshold)
+        lines.append(
+            f"{verdict} — {blocking_count} finding(s) at or above `{threshold.value}` "
+            f"out of {total} total."
+        )
+    else:
+        lines.append(f"{verdict} — {total} finding(s).")
+    lines.append("")
+
+    lines.append("## Summary")
+    lines.append("")
+    lines.append("| Severity | Count |")
+    lines.append("| --- | ---: |")
+    for severity in SEVERITY_ORDER:
+        if counts[severity]:
+            lines.append(f"| {SEVERITY_ICONS[severity]} {severity.value} | {counts[severity]} |")
+    lines.append(f"| **Total** | **{total}** |")
+    lines.append("")
+
+    lines.append("## Findings by file")
+    lines.append("")
+    for path, findings in group_by_file(result.findings).items():
+        lines.append(f"### `{path}` — {len(findings)} finding(s)")
+        lines.append("")
+        lines.append("| Line | Severity | Rule | Resource | Issue |")
+        lines.append("| ---: | --- | --- | --- | --- |")
+        for finding in findings:
+            lines.append(
+                f"| {finding.line} "
+                f"| {SEVERITY_ICONS[finding.severity]} {finding.severity.value} "
+                f"| `{finding.rule_id}` "
+                f"| `{_escape(finding.resource)}` "
+                f"| {_escape(finding.message)} |"
+            )
+        lines.append("")
+
+    lines.append("## Details and remediation")
+    lines.append("")
+    for finding in result.sorted_findings():
+        lines.append(
+            f"<details><summary>{SEVERITY_ICONS[finding.severity]} "
+            f"<b>{finding.severity.value}</b> — {_escape(finding.title)} "
+            f"(<code>{finding.rule_id}</code>) at <code>{finding.location}</code></summary>"
+        )
+        lines.append("")
+        lines.append(f"**Resource**: `{finding.resource}`  ")
+        lines.append(f"**Issue**: {finding.message}")
+        lines.append("")
+        if finding.snippet:
+            lines.append("```hcl" if finding.category == "terraform" else "```dockerfile")
+            lines.append(finding.snippet)
+            lines.append("```")
+            lines.append("")
+        if finding.why:
+            lines.append(f"**Why it matters** — {finding.why}")
+            lines.append("")
+        if finding.remediation:
+            lines.append(f"**Remediation** — {finding.remediation}")
+            lines.append("")
+        if finding.references:
+            lines.append("**References**")
+            for reference in finding.references:
+                lines.append(f"- {reference}")
+            lines.append("")
+        lines.append("</details>")
+        lines.append("")
+
+    lines.extend(_footer(result))
+    return "\n".join(lines)
+
+
+def _blocking(result: ScanResult, threshold: Severity | None) -> bool:
+    if threshold is None:
+        return False
+    return result.count_at_or_above(threshold) > 0
+
+
+def _footer(result: ScanResult) -> list[str]:
+    lines = ["---", ""]
+    if result.errors:
+        lines.append("### ⚠️ Scan errors")
+        lines.append("")
+        for error in result.errors:
+            lines.append(f"- `{_escape(error)}`")
+        lines.append("")
+    lines.append(
+        "<sub>Generated by "
+        "[CloudGuard-IaC](https://github.com/FlorianMartins/cloudguard-iac) "
+        f"v{result.tool_version} — shift-left security for Terraform and containers.</sub>"
+    )
+    return lines

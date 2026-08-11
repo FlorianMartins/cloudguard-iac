@@ -1,0 +1,116 @@
+name: "CloudGuard-IaC scan"
+description: >-
+  Scan Terraform files and Dockerfiles for misconfigurations and fail the
+  workflow when a finding reaches the configured severity.
+author: "Florian Martins"
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  path:
+    description: "File or directory to scan."
+    required: false
+    default: "."
+  scanner:
+    description: "Which scanner to run: full-scan, scan-iac or scan-docker."
+    required: false
+    default: "full-scan"
+  fail-on:
+    description: "Severity that fails the job: critical, high, medium, low, info or never."
+    required: false
+    default: "high"
+  format:
+    description: "Report format written to `output`: text, json, markdown, html or sarif."
+    required: false
+    default: "json"
+  output:
+    description: "Path of the report file to write. Leave empty to print to the log only."
+    required: false
+    default: "cloudguard-report.json"
+  ignore:
+    description: "Space separated rule ids to ignore (e.g. 'CG_IAC_015 CG_DOCKER_011')."
+    required: false
+    default: ""
+  exclude:
+    description: "Space separated path patterns to skip (e.g. 'examples/** legacy/')."
+    required: false
+    default: ""
+  summary:
+    description: "Append a Markdown summary of the findings to the job page."
+    required: false
+    default: "true"
+  version:
+    description: >-
+      Version of CloudGuard-IaC to install. A PyPI specifier (`1.0.0`) or a git
+      ref of this repository (`main`, `v1.0.0`).
+    required: false
+    default: "main"
+  python-version:
+    description: "Python version used to run the scanner."
+    required: false
+    default: "3.12"
+
+outputs:
+  exit-code:
+    description: "Exit code of the scan: 0 clean, 1 blocking findings, 2 error."
+    value: ${{ steps.scan.outputs.exit-code }}
+  report:
+    description: "Path of the generated report."
+    value: ${{ steps.scan.outputs.report }}
+  total:
+    description: "Total number of findings (JSON format only)."
+    value: ${{ steps.scan.outputs.total }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install CloudGuard-IaC
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        case "${{ inputs.version }}" in
+          # A bare version number comes from PyPI; anything else is a git ref.
+          [0-9]*) pip install "cloudguard-iac==${{ inputs.version }}" ;;
+          *) pip install "cloudguard-iac @ git+https://github.com/FlorianMartins/cloudguard-iac@${{ inputs.version }}" ;;
+        esac
+
+    - name: Run CloudGuard-IaC
+      id: scan
+      shell: bash
+      run: |
+        args=("${{ inputs.scanner }}" "${{ inputs.path }}" "--fail-on" "${{ inputs.fail-on }}")
+
+        for rule in ${{ inputs.ignore }}; do args+=("--ignore" "$rule"); done
+        for pattern in ${{ inputs.exclude }}; do args+=("--exclude" "$pattern"); done
+
+        if [ -n "${{ inputs.output }}" ]; then
+          args+=("--format" "${{ inputs.format }}" "--output" "${{ inputs.output }}")
+        fi
+
+        set +e
+        cloudguard "${args[@]}"
+        code=$?
+        set -e
+
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        echo "report=${{ inputs.output }}" >> "$GITHUB_OUTPUT"
+
+        if [ "${{ inputs.format }}" = "json" ] && [ -f "${{ inputs.output }}" ]; then
+          total=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['summary']['total'])" "${{ inputs.output }}")
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+        fi
+
+        if [ "${{ inputs.summary }}" = "true" ] && [ "${{ inputs.format }}" = "json" ] \
+           && [ -f "${{ inputs.output }}" ]; then
+          cloudguard generate-report -I "${{ inputs.output }}" -F markdown --fail-on never \
+            >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        exit $code

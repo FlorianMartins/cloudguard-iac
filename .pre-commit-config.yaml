@@ -1,0 +1,49 @@
+# Local guardrails: the same gates as the CI pipeline, before the commit exists.
+#   pip install pre-commit && pre-commit install
+default_language_version:
+  python: python3.12
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [typer>=0.12, rich>=13.0]
+        args: [--strict]
+        files: ^cloudguard/
+
+  - repo: local
+    hooks:
+      # CloudGuard scanning the repository it lives in.
+      - id: cloudguard
+        name: CloudGuard-IaC
+        entry: cloudguard full-scan --exclude examples/vulnerable
+        language: system
+        pass_filenames: false
+        files: \.(tf|tfvars)$|(^|/)Dockerfile
+
+      - id: rules-table
+        name: README rules table in sync
+        entry: python scripts/sync_rules_table.py --check
+        language: system
+        pass_filenames: false
+        files: ^(cloudguard/rules\.py|README\.md)$

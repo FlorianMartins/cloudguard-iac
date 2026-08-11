@@ -1,0 +1,303 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly run: dependency advisories appear without any commit of ours.
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+# Least privilege by default; jobs opt into what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_DEFAULT: "3.12"
+  FORCE_COLOR: "1"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Code quality — formatting, linting, typing
+  # ---------------------------------------------------------------------------
+  quality:
+    name: Lint & types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the project
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+
+      - name: Ruff — lint
+        run: ruff check --output-format=github .
+
+      - name: Ruff — formatting
+        run: ruff format --check --diff .
+
+      - name: Mypy — static types (strict)
+        run: mypy
+
+  # ---------------------------------------------------------------------------
+  # 2. Tests — every supported Python version
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the project
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+
+      - name: Pytest
+        run: pytest --cov=cloudguard --cov-report=term-missing --cov-report=xml
+
+      - name: Upload the coverage report
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # 3. SAST — we scan our own source code too
+  # ---------------------------------------------------------------------------
+  sast:
+    name: SAST & dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the project
+        run: python -m pip install --upgrade pip && pip install -e ".[dev]"
+
+      - name: Bandit — Python SAST
+        run: bandit -c pyproject.toml -r cloudguard
+
+      - name: pip-audit — known vulnerabilities in dependencies
+        # --skip-editable ignores the project itself (installed in editable mode);
+        # --strict would turn that skip into an error.
+        run: pip-audit --skip-editable
+
+      - name: Semgrep — extended rulesets
+        # Advisory: Semgrep pulls its rules from a remote registry, so a network
+        # hiccup must not turn into a red build. Bandit above is the blocking gate.
+        continue-on-error: true
+        run: |
+          pip install semgrep
+          semgrep scan --config p/python --config p/security-audit --error --quiet .
+
+  # ---------------------------------------------------------------------------
+  # 4. Dogfooding — CloudGuard runs against itself and its example corpus.
+  #    This is the job that proves the tool blocks a pipeline.
+  # ---------------------------------------------------------------------------
+  dogfood:
+    name: CloudGuard self-scan
+    runs-on: ubuntu-latest
+    needs: [quality, test]
+    permissions:
+      contents: read
+      security-events: write # required to upload the SARIF report
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install CloudGuard
+        run: python -m pip install --upgrade pip && pip install -e .
+
+      # --- The gate: the tool must accept what is secure ---------------------
+      - name: Hardened examples must pass (expect exit 0)
+        run: cloudguard full-scan examples/secure --details
+
+      - name: Our own code and image must pass (expect exit 0)
+        run: cloudguard full-scan . --exclude 'examples/vulnerable'
+
+      # --- The demo: the tool must block what is not -------------------------
+      - name: Vulnerable examples must block the build (expect exit 1)
+        run: |
+          set +e
+          cloudguard full-scan examples/vulnerable --fail-on high
+          code=$?
+          set -e
+          echo "cloudguard exited with $code"
+          if [ "$code" -ne 1 ]; then
+            echo "::error::expected exit code 1 (blocking findings), got $code"
+            exit 1
+          fi
+          echo "✅ the pipeline was correctly blocked by CloudGuard"
+
+      # --- The artefacts: scan once, publish everywhere ----------------------
+      - name: Produce the machine-readable result
+        run: cloudguard full-scan examples/vulnerable -F json -o reports/results.json --fail-on never
+
+      - name: Render the HTML, Markdown and SARIF reports
+        run: |
+          cloudguard generate-report -I reports/results.json -F html     -o reports/report.html  --fail-on never
+          cloudguard generate-report -I reports/results.json -F markdown -o reports/report.md    --fail-on never
+          cloudguard generate-report -I reports/results.json -F sarif    -o reports/report.sarif --fail-on never
+
+      - name: Publish the summary in the job page
+        run: |
+          {
+            echo "## 🛡️ CloudGuard-IaC — demonstration on \`examples/vulnerable\`"
+            echo
+            echo "> This scan is **expected to fail**: the files are vulnerable by design."
+            echo
+            cloudguard generate-report -I reports/results.json -F markdown --fail-on never
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the reports as build artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudguard-reports
+          path: reports/
+          retention-days: 30
+
+      - name: Upload SARIF to GitHub code scanning
+        # Code scanning is unavailable on private repositories without GHAS, so a
+        # failure here must not fail the pipeline.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/report.sarif
+          category: cloudguard-iac
+
+  # ---------------------------------------------------------------------------
+  # 5. Documentation — the rules table in the README is generated, never typed
+  # ---------------------------------------------------------------------------
+  docs:
+    name: Docs in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the project
+        run: python -m pip install --upgrade pip && pip install -e .
+
+      - name: The README rules table must match the registry
+        run: |
+          python scripts/sync_rules_table.py --check || {
+            echo "::error::the rules table drifted — run 'make docs' and commit the result"
+            exit 1
+          }
+
+  # ---------------------------------------------------------------------------
+  # 6. Packaging — the wheel and sdist must always be buildable
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build the distribution
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_DEFAULT }}
+
+      - name: Build the wheel and the sdist
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+          twine check dist/*
+
+      - name: Smoke-test the wheel in a clean environment
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          /tmp/smoke/bin/cloudguard --version
+          /tmp/smoke/bin/cloudguard rules --format json > /dev/null
+          /tmp/smoke/bin/cloudguard scan-iac examples/secure
+
+      - name: Upload the distribution
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 14
+
+  # ---------------------------------------------------------------------------
+  # 7. Container image — build it, then scan it with CloudGuard itself
+  # ---------------------------------------------------------------------------
+  container:
+    name: Container image
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t cloudguard-iac:ci .
+
+      - name: The image must scan the vulnerable corpus and block
+        run: |
+          set +e
+          docker run --rm -v "$PWD/examples:/scan:ro" cloudguard-iac:ci full-scan /scan/vulnerable
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::expected exit code 1 from the container, got $code"
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 8. Final gate — one required status check to protect the branch with
+  # ---------------------------------------------------------------------------
+  ci:
+    name: CI complete
+    runs-on: ubuntu-latest
+    needs: [quality, test, sast, dogfood, docs, build, container]
+    if: always()
+    steps:
+      - name: Fail when any job failed
+        run: |
+          results='${{ join(needs.*.result, " ") }}'
+          echo "job results: $results"
+          for result in $results; do
+            if [ "$result" != "success" ]; then
+              echo "::error::a required job did not succeed"
+              exit 1
+            fi
+          done
+          echo "✅ every job succeeded"

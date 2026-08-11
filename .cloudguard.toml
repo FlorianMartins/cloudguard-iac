@@ -1,0 +1,19 @@
+# CloudGuard-IaC configuration for this repository.
+#
+# Command line flags always win over this file, so a developer can still run
+# `cloudguard full-scan . --fail-on low` locally to see everything.
+[cloudguard]
+
+# Anything HIGH or CRITICAL blocks a build.
+fail_on = "HIGH"
+
+# No rule is ignored here: the hardened examples and the project's own
+# Dockerfile are expected to pass the full catalogue. Two rules are suppressed
+# inline, each with its justification, in:
+#   * examples/secure/main.tf  — CG_IAC_015 on the log destination bucket
+#   * Dockerfile               — CG_DOCKER_011 on a one-shot CLI image
+ignore = []
+
+# `examples/vulnerable` is scanned explicitly by the CI demo, never as part of a
+# repository-wide scan.
+exclude = []
