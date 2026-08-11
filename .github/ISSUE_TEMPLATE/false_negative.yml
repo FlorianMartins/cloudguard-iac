@@ -1,0 +1,24 @@
+name: "🕳️ Missed misconfiguration"
+description: CloudGuard accepted something that is insecure.
+title: "[FN] not detected: …"
+labels: ["false-negative", "bug"]
+body:
+  - type: textarea
+    id: snippet
+    attributes:
+      label: The insecure configuration that was not detected
+      render: hcl
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: What an attacker gains
+      description: The impact, so the severity can be judged.
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: Existing rule that should have caught it (if any)
+      placeholder: CG_IAC_005

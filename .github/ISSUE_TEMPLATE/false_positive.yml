@@ -1,0 +1,40 @@
+name: "🔕 False positive"
+description: CloudGuard flagged something that is actually secure.
+title: "[FP] CG_XXX_000 fires on …"
+labels: ["false-positive", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **False positives are bugs, and the worst kind.** A tool that cries wolf gets
+        ignored, and an ignored tool protects nothing. Thanks for reporting this one.
+  - type: input
+    id: rule
+    attributes:
+      label: Rule id
+      placeholder: CG_IAC_011
+    validations:
+      required: true
+  - type: textarea
+    id: snippet
+    attributes:
+      label: Smallest snippet that reproduces it
+      description: The few lines that trigger the finding — not the whole file.
+      render: hcl
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this configuration is actually safe
+      description: What makes the finding wrong here? A reference to the vendor docs helps.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: CloudGuard version
+      description: "Output of `cloudguard --version`"
+      placeholder: "1.0.0"
+    validations:
+      required: true

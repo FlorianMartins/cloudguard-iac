@@ -3,6 +3,17 @@
 Thanks for taking the time. A new rule, a false positive killed, a clearer remediation —
 all three make the tool more useful.
 
+By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Where to start
+
+| I want to… | Go to |
+|---|---|
+| Report a rule that fires wrongly | [False positive issue](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=false_positive.yml) |
+| Report a misconfiguration that slipped through | [Missed misconfiguration issue](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=false_negative.yml) |
+| Propose a new check | [New rule issue](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=rule_request.yml) |
+| Report a vulnerability **in CloudGuard itself** | [Private advisory](https://github.com/FlorianMartins/cloudguard-iac/security/advisories/new) — never a public issue |
+
 ## Getting set up
 
 ```bash
@@ -16,6 +27,19 @@ Optionally install the local guardrails so the same gates run before each commit
 
 ```bash
 pip install pre-commit && pre-commit install
+```
+
+## The workflow
+
+`main` is protected: it requires the **CI complete** check to be green, refuses force
+pushes and keeps a linear history. So work on a branch and open a pull request:
+
+```bash
+git switch -c feat/my-rule
+# … work, then …
+make check                       # everything the pipeline checks, locally
+git push -u origin feat/my-rule
+gh pr create --fill
 ```
 
 ## The bar for a pull request

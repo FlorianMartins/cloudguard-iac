@@ -1,0 +1,34 @@
+version: 2
+
+updates:
+  # Python dependencies — a vulnerable transitive package is a supply-chain issue,
+  # and pip-audit only tells us after the fact.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+    open-pull-requests-limit: 5
+    labels: ["dependencies"]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # The actions used by the pipeline. Pinned to a major version, so this catches
+  # the deprecations (Node runtime, for one) before the runners force them on us.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # The base image of the tool's own container.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: monthly
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "chore(docker)"

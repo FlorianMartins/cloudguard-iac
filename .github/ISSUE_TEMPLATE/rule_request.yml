@@ -1,0 +1,41 @@
+name: "🛡️ New detection rule"
+description: Propose a check CloudGuard does not implement yet.
+title: "[RULE] detect …"
+labels: ["rule", "enhancement"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Target
+      options: ["terraform", "docker"]
+    validations:
+      required: true
+  - type: textarea
+    id: pattern
+    attributes:
+      label: The insecure pattern
+      render: hcl
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is dangerous
+      description: The impact — what an attacker gains, what a breach costs. Not a restatement of the title.
+    validations:
+      required: true
+  - type: textarea
+    id: remediation
+    attributes:
+      label: The fix
+      description: The attribute to set, the resource to add, the command to run.
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Suggested severity
+      description: See the criteria in CONTRIBUTING.md.
+      options: ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+    validations:
+      required: true

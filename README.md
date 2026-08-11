@@ -801,8 +801,15 @@ make install
 make check          # must be green before opening a pull request
 ```
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the conventions, and
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the conventions,
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for how we work together, and
 [SECURITY.md](SECURITY.md) to report a vulnerability in the tool itself.
+
+`main` is protected — the **CI complete** check must be green, force pushes are refused
+and history stays linear — so contributions go through a pull request. Issue templates are
+provided for [false positives](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=false_positive.yml),
+[missed misconfigurations](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=false_negative.yml)
+and [new rules](https://github.com/FlorianMartins/cloudguard-iac/issues/new?template=rule_request.yml).
 
 **False positives are bugs.** A security tool that cries wolf gets ignored, and an ignored
 tool protects nothing. Open an issue with the smallest snippet that reproduces it.

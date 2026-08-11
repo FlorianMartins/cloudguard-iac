@@ -7,6 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Open-source scaffolding: Contributor Covenant code of conduct, issue templates (false
+  positive, missed misconfiguration, new rule, bug), pull-request template, and Dependabot
+  for the Python dependencies, the GitHub Actions and the container base image.
+
 ### Changed
 
 - CI: pinned every GitHub Action to its current major version (`checkout@v7`,
