@@ -10,7 +10,7 @@
 
 # Pin the digest in production — `python:3.12-slim-bookworm@sha256:<digest>` —
 # and let Renovate keep it fresh.
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.15-slim-bookworm AS builder
 
 WORKDIR /src
 
@@ -27,7 +27,7 @@ RUN pip install --no-cache-dir --prefix=/install .
 # one-shot CLI and exits: there is no long-running process to probe, so the rule
 # is suppressed here with an explicit justification rather than silenced globally.
 # cloudguard:ignore CG_DOCKER_011 one-shot CLI image, nothing to health-check
-FROM python:3.12-slim-bookworm AS runtime
+FROM python:3.15-slim-bookworm AS runtime
 
 LABEL org.opencontainers.image.title="cloudguard-iac" \
       org.opencontainers.image.description="Shift-left security scanner for Terraform and container images" \
